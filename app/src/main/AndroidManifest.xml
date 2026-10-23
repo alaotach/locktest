@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Lifts Android 10+ background-activity restrictions so we can call
+         startActivity() directly from ScreenOnReceiver on ACTION_SCREEN_OFF -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Required to bring an existing lockscreen Activity instance to the front
+         using FLAG_ACTIVITY_REORDER_TO_FRONT without creating a duplicate -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.LockTest">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.LockTest"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            Lock-screen overlay Activity.
+            • showWhenLocked / turnScreenOn declared here for API 26+ (belt-and-suspenders
+              alongside the programmatic setShowWhenLocked() call in code).
+            • singleTop launch mode + no taskAffinity override: avoids the isolation
+              that singleInstance causes, which was preventing showWhenLocked from working.
+            • excludeFromRecents keeps it out of the task switcher.
+        -->
+        <activity
+            android:name=".LockScreenActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.LockTest.Transparent"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop" />
+
+        <!--
+            Foreground service fallback — used only when Notification Listener
+            access is NOT granted. Stopped automatically by MainActivity when
+            NotificationListenerServiceImpl takes over as process anchor.
+        -->
+        <service
+            android:name=".LockScreenService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <!--
+            NotificationListenerService — the silent process anchor.
+            NotificationManagerService (system_server) holds a persistent binding
+            to this service once the user grants Notification Access, keeping the
+            app process alive even after a recents swipe — without any notification.
+        -->
+        <service
+            android:name=".NotificationListenerServiceImpl"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!--
+            Boot receiver — re-activates LockScreenService after a reboot.
+            LOCKED_BOOT_COMPLETED: fires in Direct Boot mode (before first post-reboot unlock).
+            BOOT_COMPLETED: fires after first unlock — fallback.
+        -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>
